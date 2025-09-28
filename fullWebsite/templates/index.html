@@ -113,7 +113,7 @@
 </head>
 <body>
    <div class="container">
-        <img src="https://media.discordapp.net/attachments/1303091710636593254/1304937879251845250/image.png?ex=6731359a&is=672fe41a&hm=9c78eb49ef3723c03bb87453fa9e9faf80b28f09bcb2e0aee296674bca7edb7a&=&format=webp&quality=lossless&width=625&height=625" alt="UMass Food Finder Logo" onclick="window.location.href = '/';">
+    <img src="{{ url_for('static', filename='image.png') }}" alt="UMass Food Finder Logo">
        <h1>UMass Food Finder</h1>
         <!--Drop down menu -->
        <input type="text" id="foodName" placeholder="Enter food name" onkeyup="showSuggestions()" />
