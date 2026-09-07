@@ -153,6 +153,34 @@ def test_analytics_script_is_only_rendered_when_configured():
     assert b'/analytics/script.js' in with_analytics.data
 
 
+def test_feedback_form_is_only_enabled_when_configured():
+    app = create_app(menu_snapshot=MenuSnapshot(successful_sources=1))
+    app.config.update(TESTING=True, FORMSPREE_FORM_ID="")
+    without_feedback = app.test_client().get("/")
+
+    app.config["FORMSPREE_FORM_ID"] = "abc123"
+    with_feedback = app.test_client().get("/")
+
+    assert b'id="feedback-form"' not in without_feedback.data
+    assert b"Feedback is not configured yet" in without_feedback.data
+    assert b'id="feedback-form"' in with_feedback.data
+    assert b'data-endpoint="https://formspree.io/f/abc123"' in with_feedback.data
+    assert b'name="_gotcha"' in with_feedback.data
+    assert b'name="email"' not in with_feedback.data
+
+
+def test_feedback_form_contains_anonymous_category_and_message_fields():
+    app = create_app(menu_snapshot=MenuSnapshot(successful_sources=1))
+    app.config.update(TESTING=True, FORMSPREE_FORM_ID="abc123")
+
+    response = app.test_client().get("/")
+
+    assert b'name="category"' in response.data
+    assert b'name="message"' in response.data
+    assert b'minlength="10"' in response.data
+    assert b'maxlength="2000"' in response.data
+
+
 def test_partial_snapshot_explains_that_no_match_may_be_incomplete():
     failure = SourceFailure("Franklin", "2026-09-06", "offline")
     snapshot = MenuSnapshot(successful_sources=3, failures=[failure])

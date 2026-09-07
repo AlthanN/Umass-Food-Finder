@@ -58,6 +58,61 @@
       </article>
       {% endfor %}
     </section>
+
+    <section class="feedback" aria-labelledby="feedback-heading">
+      <div class="feedback-intro">
+        <p class="eyebrow">Help improve the finder</p>
+        <h2 id="feedback-heading">Share anonymous feedback</h2>
+        <p>Found a problem or have an idea? Let us know. Please do not include personal information.</p>
+      </div>
+
+      {% if formspree_form_id %}
+      <form
+        id="feedback-form"
+        class="feedback-form"
+        data-endpoint="https://formspree.io/f/{{ formspree_form_id | e }}"
+        novalidate
+      >
+        <div>
+          <label for="feedback-category">What is this about?</label>
+          <select id="feedback-category" name="category" required>
+            <option value="">Choose a category</option>
+            <option value="Feature idea">Feature idea</option>
+            <option value="Bug or problem">Bug or problem</option>
+            <option value="Menu accuracy">Menu accuracy</option>
+            <option value="Design or usability">Design or usability</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label for="feedback-message">Your feedback</label>
+          <textarea
+            id="feedback-message"
+            name="message"
+            rows="5"
+            minlength="10"
+            maxlength="2000"
+            placeholder="Tell us what would make UMass Food Finder better"
+            required
+          ></textarea>
+        </div>
+        <input type="hidden" name="_subject" value="New UMass Food Finder feedback">
+        <div class="honeypot" aria-hidden="true">
+          <label for="feedback-website">Leave this field empty</label>
+          <input id="feedback-website" name="_gotcha" type="text" tabindex="-1" autocomplete="off">
+        </div>
+        <div class="feedback-actions">
+          <button id="feedback-button" type="submit">Send feedback</button>
+          <p class="privacy-note">Anonymous submissions are processed by Formspree and emailed to the project owner.</p>
+        </div>
+        <div id="feedback-status" class="feedback-status" role="status" aria-live="polite"></div>
+      </form>
+      {% else %}
+      <p class="feedback-unavailable" role="status">
+        Feedback is not configured yet. Set <code>FORMSPREE_FORM_ID</code> to enable this form.
+      </p>
+      {% endif %}
+    </section>
   </main>
 </body>
 </html>

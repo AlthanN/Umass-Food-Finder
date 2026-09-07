@@ -4,6 +4,9 @@ const searchButton = document.querySelector("#search-button");
 const suggestions = document.querySelector("#suggestions");
 const resultsSection = document.querySelector("#results");
 const statusBox = document.querySelector("#status");
+const feedbackForm = document.querySelector("#feedback-form");
+const feedbackButton = document.querySelector("#feedback-button");
+const feedbackStatus = document.querySelector("#feedback-status");
 
 let suggestionTimer;
 let suggestionController;
@@ -28,6 +31,49 @@ input.addEventListener("input", () => {
 document.addEventListener("click", (event) => {
   if (!form.contains(event.target)) closeSuggestions();
 });
+
+feedbackForm?.addEventListener("submit", submitFeedback);
+
+async function submitFeedback(event) {
+  event.preventDefault();
+  if (!feedbackForm.checkValidity()) {
+    feedbackForm.reportValidity();
+    return;
+  }
+
+  setFeedbackLoading(true);
+  showFeedbackStatus("Sending your feedback…");
+  try {
+    const response = await fetch(feedbackForm.dataset.endpoint, {
+      method: "POST",
+      body: new FormData(feedbackForm),
+      headers: { Accept: "application/json" },
+    });
+
+    if (response.ok) {
+      feedbackForm.reset();
+      showFeedbackStatus("Thank you! Your feedback was sent.", "success");
+    } else if (response.status === 429) {
+      showFeedbackStatus("Too many submissions were sent recently. Please try again later.", "error");
+    } else {
+      showFeedbackStatus("Your feedback could not be sent. Please check the form and try again.", "error");
+    }
+  } catch (error) {
+    showFeedbackStatus("Your feedback could not be sent. Check your connection and try again.", "error");
+  } finally {
+    setFeedbackLoading(false);
+  }
+}
+
+function showFeedbackStatus(message, kind = "info") {
+  feedbackStatus.textContent = message;
+  feedbackStatus.dataset.kind = kind;
+}
+
+function setFeedbackLoading(isLoading) {
+  feedbackButton.disabled = isLoading;
+  feedbackButton.textContent = isLoading ? "Sending…" : "Send feedback";
+}
 
 async function search(rawQuery) {
   const query = rawQuery.trim();

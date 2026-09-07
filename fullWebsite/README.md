@@ -50,6 +50,19 @@ Tests use fake HTTP and Redis clients and never contact UMass Dining.
 7. Open `https://YOUR_DOMAIN/health`. It should return HTTP 200 with an `ok`
    status and a `loaded_at` timestamp.
 
+## Enable anonymous feedback
+
+1. Create a form named **UMass Food Finder Feedback** at Formspree and verify
+   the email address that should receive submissions.
+2. Copy the ID from its endpoint (`https://formspree.io/f/YOUR_FORM_ID`).
+3. Add `FORMSPREE_FORM_ID` to the Vercel Production environment, using only
+   the ID as its value, and redeploy.
+4. In Formspree, restrict submissions to your production domain. The page also
+   includes a hidden honeypot field for low-friction spam filtering.
+
+The form asks only for a category and message. It does not collect a name or
+email address, and feedback is sent directly to Formspree rather than Redis.
+
 The Vercel cron invokes `/api/refresh` at `0 10 * * *`. Vercel schedules are
 UTC-only, so this is 6:00 AM Eastern during daylight time and 5:00 AM during
 standard time. The endpoint rejects requests that do not carry the configured

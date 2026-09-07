@@ -44,12 +44,14 @@ def create_app(
     app.config["VERCEL_ANALYTICS_SCRIPT_SRC"] = os.getenv(
         "VERCEL_ANALYTICS_SCRIPT_SRC", ""
     )
+    app.config["FORMSPREE_FORM_ID"] = os.getenv("FORMSPREE_FORM_ID", "")
 
     @app.get("/")
     def index():
         return render_template(
             "index.html",
             analytics_script_src=app.config["VERCEL_ANALYTICS_SCRIPT_SRC"],
+            formspree_form_id=app.config["FORMSPREE_FORM_ID"],
         )
 
     @app.get("/search")
