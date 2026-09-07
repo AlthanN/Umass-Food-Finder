@@ -6,3 +6,7 @@ __pycache__/
 htmlcov/
 .DS_Store
 *.json
+!vercel.json
+.env
+.env.*
+!.env.example

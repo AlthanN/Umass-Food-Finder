@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 import requests
@@ -21,10 +22,18 @@ DINING_HALLS = {1: "Worcester", 2: "Franklin", 3: "Hampshire", 4: "Berkshire"}
 
 
 class MenuScraper:
-    def __init__(self, *, session=None, max_days: int = 14, timeout: float = 10) -> None:
+    def __init__(
+        self,
+        *,
+        session=None,
+        max_days: int = 14,
+        timeout: float = 10,
+        max_workers: int = 8,
+    ) -> None:
         self.session = session or self._build_session()
         self.max_days = max_days
         self.timeout = timeout
+        self.max_workers = max_workers
 
     @staticmethod
     def _build_session() -> requests.Session:
@@ -50,27 +59,40 @@ class MenuScraper:
         failures: list[SourceFailure] = []
         successful_sources = 0
 
-        for location_id, location_name in DINING_HALLS.items():
-            for date_value in dates:
-                try:
-                    response = self.session.get(
-                        MENU_API_URL,
-                        params={"tid": location_id, "date": date_value},
-                        timeout=self.timeout,
-                    )
-                    response.raise_for_status()
-                    items.extend(parse_menu_response(date_value, location_name, response.content))
+        sources = [
+            (location_id, location_name, date_value)
+            for location_id, location_name in DINING_HALLS.items()
+            for date_value in dates
+        ]
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            for source_items, failure in executor.map(self._fetch_source, sources):
+                if failure is None:
+                    items.extend(source_items)
                     successful_sources += 1
-                except (requests.RequestException, ValueError, TypeError) as exc:
-                    LOGGER.warning("Could not load %s menu for %s: %s", location_name, date_value, exc)
-                    failures.append(SourceFailure(location_name, _format_date_safe(date_value), str(exc)))
+                else:
+                    failures.append(failure)
 
         return MenuSnapshot(
             items=items,
             failures=failures,
-            attempted_sources=len(DINING_HALLS) * len(dates),
+            attempted_sources=len(sources),
             successful_sources=successful_sources,
         )
+
+    def _fetch_source(self, source):
+        location_id, location_name, date_value = source
+        try:
+            response = self.session.get(
+                MENU_API_URL,
+                params={"tid": location_id, "date": date_value},
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return parse_menu_response(date_value, location_name, response.content), None
+        except (requests.RequestException, ValueError, TypeError) as exc:
+            LOGGER.warning("Could not load %s menu for %s: %s", location_name, date_value, exc)
+            failure = SourceFailure(location_name, _format_date_safe(date_value), str(exc))
+            return [], failure
 
     def _fetch_dates(self) -> list[str]:
         response = self.session.get(MENU_PAGE_URL, timeout=self.timeout)

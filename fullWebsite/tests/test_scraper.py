@@ -60,7 +60,7 @@ def test_parse_menu_response_rejects_unexpected_data(content):
 def test_successful_empty_responses_are_empty_not_unavailable():
     session = FakeSession([FakeResponse(b"{}") for _ in DINING_HALLS])
 
-    snapshot = MenuScraper(session=session).fetch()
+    snapshot = MenuScraper(session=session, max_workers=1).fetch()
 
     assert snapshot.data_status == "empty"
     assert snapshot.successful_sources == 4
@@ -70,7 +70,7 @@ def test_successful_empty_responses_are_empty_not_unavailable():
 def test_scraper_preserves_successful_data_after_partial_failure():
     responses = [menu_response(), requests.ConnectionError("offline"), menu_response(), menu_response()]
 
-    snapshot = MenuScraper(session=FakeSession(responses)).fetch()
+    snapshot = MenuScraper(session=FakeSession(responses), max_workers=1).fetch()
 
     assert snapshot.data_status == "partial"
     assert snapshot.successful_sources == 3
@@ -83,7 +83,7 @@ def test_missing_date_selector_returns_unavailable():
         def get(self, url, **kwargs):
             return FakeResponse(b"<html></html>")
 
-    snapshot = MenuScraper(session=NoDatesSession([])).fetch()
+    snapshot = MenuScraper(session=NoDatesSession([]), max_workers=1).fetch()
 
     assert snapshot.data_status == "unavailable"
     assert snapshot.items == []
