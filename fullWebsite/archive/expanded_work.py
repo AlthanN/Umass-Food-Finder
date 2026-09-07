@@ -1,3 +1,5 @@
+"""Archived early scraper prototype. Not used by the Flask app."""
+
 from bs4 import BeautifulSoup
 import requests
 import csv
@@ -52,4 +54,3 @@ if select_me:
                     print()
          
 # figure out how to organize all and what to do with it as we continue
-

@@ -1,3 +1,5 @@
+"""Archived import-time scraper prototype. Not used by the Flask app."""
+
 from bs4 import BeautifulSoup
 import requests
 import json
@@ -68,6 +70,5 @@ if select_me:
             # Store data in memory
             menu_data[f"{new_date}-{location_name}"] = doc
          
-
 
 

@@ -1,4 +1,6 @@
 
+"""Archived command-line search prototype. Not used by the Flask app."""
+
 from Aidanscrapestore import menu_data
 
 foodName = input("What do you desire: ")
@@ -23,4 +25,3 @@ if not found_food:
     
         
         
-
