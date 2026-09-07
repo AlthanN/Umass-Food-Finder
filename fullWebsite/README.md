@@ -33,8 +33,10 @@ Tests use fake HTTP and Redis clients and never contact UMass Dining.
 1. Import `https://github.com/AlthanN/Umass-Food-Finder` in Vercel.
 2. Set the project's **Root Directory** to `fullWebsite`.
 3. Install **Upstash for Redis** from the Vercel Marketplace and connect it to
-   the project. Confirm that Vercel added `UPSTASH_REDIS_REST_URL` and
-   `UPSTASH_REDIS_REST_TOKEN` to the production environment.
+   the project. The app accepts either `UPSTASH_REDIS_REST_URL` plus
+   `UPSTASH_REDIS_REST_TOKEN`, or the existing Vercel KV names
+   `KV_REST_API_URL` plus `KV_REST_API_TOKEN`. Do not duplicate or rename a
+   complete pair that Vercel already provided.
 4. Add `CRON_SECRET` in Project Settings > Environment Variables. Use a random
    value containing at least 16 characters and enable it for Production.
 5. Deploy the project. Vercel detects the top-level Flask `app` in `app.py`.
@@ -82,3 +84,6 @@ a failure. Partial refreshes remain searchable and identify missing hall/date
 sources. Internal request errors are logged but are not exposed by the public
 API. If Redis has not been seeded or cannot be reached, `/search` and `/health`
 return HTTP 503 with a safe unavailable response.
+
+The Redis refresh needs a read/write REST token. `KV_REST_API_READ_ONLY_TOKEN`,
+`KV_URL`, and `REDIS_URL` are not used by this application.

@@ -3,7 +3,26 @@ import json
 import pytest
 
 from food_finder.models import MenuItem, MenuSnapshot, SourceFailure
-from food_finder.storage import InMemoryMenuRepository, UpstashMenuRepository
+from food_finder.storage import (
+    InMemoryMenuRepository,
+    UpstashMenuRepository,
+    has_upstash_configuration,
+    resolve_upstash_credentials,
+)
+
+
+@pytest.fixture(autouse=True)
+def clear_redis_environment(monkeypatch):
+    for name in (
+        "UPSTASH_REDIS_REST_URL",
+        "UPSTASH_REDIS_REST_TOKEN",
+        "KV_REST_API_URL",
+        "KV_REST_API_TOKEN",
+        "KV_REST_API_READ_ONLY_TOKEN",
+        "KV_URL",
+        "REDIS_URL",
+    ):
+        monkeypatch.delenv(name, raising=False)
 
 
 class FakeRedis:
@@ -67,3 +86,48 @@ def test_in_memory_repository_can_be_replaced():
     assert repository.load() is None
     repository.save(snapshot)
     assert repository.load() is snapshot
+
+
+def test_existing_vercel_kv_credentials_are_supported(monkeypatch):
+    monkeypatch.setenv("KV_REST_API_URL", "https://kv.example")
+    monkeypatch.setenv("KV_REST_API_TOKEN", "write-token")
+
+    assert resolve_upstash_credentials() == ("https://kv.example", "write-token")
+    assert has_upstash_configuration() is True
+
+
+def test_upstash_names_take_precedence_over_vercel_kv_names(monkeypatch):
+    monkeypatch.setenv("UPSTASH_REDIS_REST_URL", "https://upstash.example")
+    monkeypatch.setenv("UPSTASH_REDIS_REST_TOKEN", "upstash-token")
+    monkeypatch.setenv("KV_REST_API_URL", "https://kv.example")
+    monkeypatch.setenv("KV_REST_API_TOKEN", "kv-token")
+
+    assert resolve_upstash_credentials() == (
+        "https://upstash.example",
+        "upstash-token",
+    )
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("UPSTASH_REDIS_REST_URL", "https://upstash.example"),
+        ("UPSTASH_REDIS_REST_TOKEN", "token-only"),
+        ("KV_REST_API_URL", "https://kv.example"),
+        ("KV_REST_API_TOKEN", "token-only"),
+        ("KV_REST_API_READ_ONLY_TOKEN", "read-only"),
+    ],
+)
+def test_incomplete_or_read_only_credentials_are_not_accepted(monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
+
+    assert resolve_upstash_credentials() is None
+    assert has_upstash_configuration() is False
+
+
+def test_incomplete_preferred_pair_does_not_mix_or_fall_back(monkeypatch):
+    monkeypatch.setenv("UPSTASH_REDIS_REST_URL", "https://upstash.example")
+    monkeypatch.setenv("KV_REST_API_URL", "https://kv.example")
+    monkeypatch.setenv("KV_REST_API_TOKEN", "kv-token")
+
+    assert resolve_upstash_credentials() is None

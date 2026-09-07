@@ -10,6 +10,8 @@ from .models import MenuSnapshot
 
 
 SNAPSHOT_KEY = "umass-food-finder:menu-snapshot:v1"
+UPSTASH_ENVIRONMENT = ("UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN")
+VERCEL_KV_ENVIRONMENT = ("KV_REST_API_URL", "KV_REST_API_TOKEN")
 
 
 class MenuRepository(Protocol):
@@ -34,7 +36,11 @@ class UpstashMenuRepository:
         if client is None:
             from upstash_redis import Redis
 
-            client = Redis.from_env(allow_telemetry=False)
+            credentials = resolve_upstash_credentials()
+            if credentials is None:
+                raise ValueError("A complete Upstash Redis credential pair is required")
+            url, token = credentials
+            client = Redis(url=url, token=token, allow_telemetry=False)
         self.client = client
         self.key = key
 
@@ -54,4 +60,14 @@ class UpstashMenuRepository:
 
 
 def has_upstash_configuration() -> bool:
-    return bool(os.getenv("UPSTASH_REDIS_REST_URL") and os.getenv("UPSTASH_REDIS_REST_TOKEN"))
+    return resolve_upstash_credentials() is not None
+
+
+def resolve_upstash_credentials() -> tuple[str, str] | None:
+    """Resolve a complete REST credential pair without mixing naming schemes."""
+    for url_name, token_name in (UPSTASH_ENVIRONMENT, VERCEL_KV_ENVIRONMENT):
+        url = os.getenv(url_name)
+        token = os.getenv(token_name)
+        if url or token:
+            return (url, token) if url and token else None
+    return None
