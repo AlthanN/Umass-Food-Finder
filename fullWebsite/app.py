@@ -5,14 +5,20 @@ from __future__ import annotations
 import hmac
 import logging
 import os
+import re
+import secrets
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, after_this_request, jsonify, render_template, request
 
 from food_finder import (
     InMemoryMenuRepository,
+    InMemorySearchAnalyticsRepository,
     MenuScraper,
     MenuSnapshot,
     UpstashMenuRepository,
+    UpstashSearchAnalyticsRepository,
     search_menu,
 )
 from food_finder.storage import has_upstash_configuration
@@ -23,6 +29,7 @@ def create_app(
     menu_snapshot=None,
     repository=None,
     scraper=None,
+    analytics_repository=None,
     load_local_data=False,
 ) -> Flask:
     """Create the app with injectable storage and scraping dependencies."""
@@ -41,10 +48,16 @@ def create_app(
 
     app.extensions["menu_repository"] = repository
     app.extensions["menu_scraper"] = scraper
+    if analytics_repository is None and isinstance(repository, UpstashMenuRepository):
+        analytics_repository = UpstashSearchAnalyticsRepository(repository.client)
+    elif analytics_repository is None:
+        analytics_repository = InMemorySearchAnalyticsRepository()
+    app.extensions["search_analytics_repository"] = analytics_repository
     app.config["VERCEL_ANALYTICS_SCRIPT_SRC"] = os.getenv(
         "VERCEL_ANALYTICS_SCRIPT_SRC", ""
     )
     app.config["FORMSPREE_FORM_ID"] = os.getenv("FORMSPREE_FORM_ID", "")
+    app.config["ANALYTICS_SECRET"] = os.getenv("ANALYTICS_SECRET", "")
 
     @app.get("/")
     def index():
@@ -61,6 +74,9 @@ def create_app(
 
         if not query:
             return jsonify(_response(snapshot, query, [], "Please enter a food name.")), 400
+
+        if request.args.get("intent") == "search":
+            _record_search(app)
 
         if snapshot.data_status == "unavailable":
             message = "Menu data is currently unavailable. Please try again later."
@@ -82,6 +98,23 @@ def create_app(
             message = None
 
         return jsonify(_response(snapshot, query, results, message))
+
+    @app.get("/api/analytics/searches")
+    def search_analytics():
+        expected_secret = app.config["ANALYTICS_SECRET"]
+        if not _has_bearer_secret(expected_secret):
+            return jsonify({"status": "unauthorized"}), 401
+
+        try:
+            report = app.extensions["search_analytics_repository"].get_report(
+                _today_eastern(), days=30
+            )
+        except Exception:
+            app.logger.exception("Could not load search analytics")
+            return jsonify({"status": "unavailable"}), 503
+        response = jsonify(report)
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.get("/api/refresh")
     def refresh_menus():
@@ -116,6 +149,47 @@ def create_app(
         ), 200 if healthy else 503
 
     return app
+
+
+VISITOR_COOKIE = "uff_visitor_id"
+VISITOR_COOKIE_MAX_AGE = 365 * 24 * 60 * 60
+VISITOR_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{20,64}$")
+
+
+def _record_search(app: Flask) -> None:
+    visitor_id = request.cookies.get(VISITOR_COOKIE, "")
+    set_cookie = VISITOR_ID_PATTERN.fullmatch(visitor_id) is None
+    if set_cookie:
+        visitor_id = secrets.token_urlsafe(18)
+
+        @after_this_request
+        def remember_visitor(response):
+            response.set_cookie(
+                VISITOR_COOKIE,
+                visitor_id,
+                max_age=VISITOR_COOKIE_MAX_AGE,
+                httponly=True,
+                secure=request.is_secure or bool(os.getenv("VERCEL")),
+                samesite="Lax",
+            )
+            return response
+
+    try:
+        app.extensions["search_analytics_repository"].record_search(
+            visitor_id, _today_eastern()
+        )
+    except Exception:
+        app.logger.exception("Could not record search analytics")
+
+
+def _today_eastern():
+    return datetime.now(ZoneInfo("America/New_York")).date()
+
+
+def _has_bearer_secret(expected_secret: str) -> bool:
+    provided_header = request.headers.get("Authorization", "")
+    expected_header = f"Bearer {expected_secret}"
+    return bool(expected_secret) and hmac.compare_digest(provided_header, expected_header)
 
 
 def _response(snapshot, query, results, message):

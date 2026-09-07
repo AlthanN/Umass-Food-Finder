@@ -83,11 +83,39 @@ Analytics are visible privately in the Vercel dashboard. Vercel reports page
 views and privacy-friendly daily unique visitors; it does not create a public
 lifetime visitor counter.
 
+## View search usage
+
+Submitted searches are counted separately from autocomplete requests. The
+analytics repository does not store search text or IP addresses. Upstash keeps
+lifetime aggregate counters and 90 days of daily counters; approximate unique
+searchers use a random, HTTP-only browser cookie and Redis HyperLogLog values.
+
+Generate a secret that is different from `CRON_SECRET`:
+
+```bash
+python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+```
+
+Add the result as `ANALYTICS_SECRET` in the Vercel Production environment and
+redeploy. Retrieve the private report with:
+
+```bash
+curl -H "Authorization: Bearer YOUR_ANALYTICS_SECRET" \
+  https://YOUR_DOMAIN/api/analytics/searches
+```
+
+The JSON response contains lifetime totals and the last 30 daily totals,
+approximate unique searching browsers, and average searches per browser. A
+browser is not the same as a verified person: cleared cookies, private windows,
+and multiple devices affect the estimate. Analytics failures are logged and do
+not prevent food searches from completing.
+
 ## Architecture and failure behavior
 
 - `app.py` defines page, search, health, and scheduled-refresh routes.
 - `food_finder/scraper.py` fetches menus concurrently with bounded workers.
 - `food_finder/storage.py` stores one versioned snapshot in Redis or memory.
+- `food_finder/analytics.py` stores aggregate search counters without queries.
 - `food_finder/search.py` performs deterministic, network-free searches.
 - `templates/` and `static/` contain the page, styles, JavaScript, and logo.
 - `archive/` contains inactive hackathon prototypes retained for reference.

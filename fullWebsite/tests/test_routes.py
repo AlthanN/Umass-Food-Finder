@@ -1,4 +1,7 @@
+from datetime import date
+
 from app import create_app
+from food_finder.analytics import InMemorySearchAnalyticsRepository
 from food_finder.models import MenuItem, MenuSnapshot, SourceFailure
 from food_finder.storage import InMemoryMenuRepository
 
@@ -189,3 +192,125 @@ def test_partial_snapshot_explains_that_no_match_may_be_incomplete():
 
     assert data["data_status"] == "partial"
     assert "may be incomplete" in data["message"]
+
+
+def test_only_intentional_nonblank_searches_are_counted(monkeypatch):
+    analytics = InMemorySearchAnalyticsRepository()
+    snapshot = MenuSnapshot(successful_sources=1)
+    app = create_app(menu_snapshot=snapshot, analytics_repository=analytics)
+    app.config.update(TESTING=True)
+    monkeypatch.setattr("app._today_eastern", lambda: date(2026, 9, 7))
+    client = app.test_client()
+
+    client.get("/search?foodName=pizza")
+    client.get("/search?foodName=pizza&intent=search")
+    client.get("/search?foodName=%20&intent=search")
+
+    report = analytics.get_report(date(2026, 9, 7), days=1)
+    assert report["lifetime"]["searches"] == 1
+    assert report["lifetime"]["unique_searchers"] == 1
+
+
+def test_search_analytics_cookie_is_private_and_reused(monkeypatch):
+    analytics = InMemorySearchAnalyticsRepository()
+    app = create_app(
+        menu_snapshot=MenuSnapshot(successful_sources=1),
+        analytics_repository=analytics,
+    )
+    app.config.update(TESTING=True)
+    monkeypatch.setattr("app._today_eastern", lambda: date(2026, 9, 7))
+    client = app.test_client()
+
+    first = client.get(
+        "/search?foodName=pizza&intent=search", base_url="https://example.com"
+    )
+    second = client.get(
+        "/search?foodName=tofu&intent=search", base_url="https://example.com"
+    )
+
+    cookie = first.headers["Set-Cookie"]
+    assert "uff_visitor_id=" in cookie
+    assert "HttpOnly" in cookie
+    assert "Secure" in cookie
+    assert "SameSite=Lax" in cookie
+    assert "Set-Cookie" not in second.headers
+    assert analytics.total_searches == 2
+    assert len(analytics.lifetime_searchers) == 1
+
+
+def test_malformed_analytics_cookie_is_replaced():
+    analytics = InMemorySearchAnalyticsRepository()
+    app = create_app(
+        menu_snapshot=MenuSnapshot(successful_sources=1),
+        analytics_repository=analytics,
+    )
+    app.config.update(TESTING=True)
+    client = app.test_client()
+    client.set_cookie("uff_visitor_id", "invalid")
+
+    response = client.get("/search?foodName=pizza&intent=search")
+
+    cookie = response.headers["Set-Cookie"]
+    assert "uff_visitor_id=" in cookie
+    assert "uff_visitor_id=invalid" not in cookie
+
+
+def test_analytics_write_failure_does_not_break_search():
+    class FailedAnalytics:
+        def record_search(self, visitor_id, day):
+            raise RuntimeError("offline")
+
+    app = create_app(
+        menu_snapshot=MenuSnapshot(successful_sources=1),
+        analytics_repository=FailedAnalytics(),
+    )
+    app.config.update(TESTING=True)
+
+    response = app.test_client().get("/search?foodName=pizza&intent=search")
+
+    assert response.status_code == 200
+    assert response.get_json()["data_status"] == "empty"
+
+
+def test_search_analytics_endpoint_is_private(monkeypatch):
+    analytics = InMemorySearchAnalyticsRepository()
+    analytics.record_search("visitor-one", date(2026, 9, 7))
+    app = create_app(
+        menu_snapshot=MenuSnapshot(successful_sources=1),
+        analytics_repository=analytics,
+    )
+    app.config.update(TESTING=True, ANALYTICS_SECRET="analytics-secret")
+    monkeypatch.setattr("app._today_eastern", lambda: date(2026, 9, 7))
+    client = app.test_client()
+
+    unauthorized = client.get("/api/analytics/searches")
+    authorized = client.get(
+        "/api/analytics/searches",
+        headers={"Authorization": "Bearer analytics-secret"},
+    )
+
+    assert unauthorized.status_code == 401
+    assert authorized.status_code == 200
+    assert authorized.headers["Cache-Control"] == "no-store"
+    assert authorized.get_json()["lifetime"]["searches"] == 1
+    assert len(authorized.get_json()["daily"]) == 30
+
+
+def test_search_analytics_endpoint_handles_storage_failure():
+    class FailedAnalytics:
+        def get_report(self, end_date, *, days):
+            raise RuntimeError("offline")
+
+    app = create_app(
+        menu_snapshot=MenuSnapshot(successful_sources=1),
+        analytics_repository=FailedAnalytics(),
+    )
+    app.config.update(TESTING=True, ANALYTICS_SECRET="analytics-secret")
+
+    response = app.test_client().get(
+        "/api/analytics/searches",
+        headers={"Authorization": "Bearer analytics-secret"},
+    )
+
+    assert response.status_code == 503
+    assert response.get_json() == {"status": "unavailable"}

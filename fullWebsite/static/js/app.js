@@ -87,7 +87,7 @@ async function search(rawQuery) {
   showStatus("Searching the loaded menus…");
   clearResults();
   try {
-    const { response, data } = await requestSearch(query);
+    const { response, data } = await requestSearch(query, undefined, true);
     renderResponse(data, response.ok);
   } catch (error) {
     showStatus("The search could not be completed. Please try again.", "error");
@@ -114,8 +114,10 @@ async function loadSuggestions(query) {
   }
 }
 
-async function requestSearch(query, signal) {
-  const response = await fetch(`/search?foodName=${encodeURIComponent(query)}`, { signal });
+async function requestSearch(query, signal, intentional = false) {
+  const parameters = new URLSearchParams({ foodName: query });
+  if (intentional) parameters.set("intent", "search");
+  const response = await fetch(`/search?${parameters}`, { signal });
   return { response, data: await response.json() };
 }
 

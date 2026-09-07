@@ -33,15 +33,7 @@ class InMemoryMenuRepository:
 
 class UpstashMenuRepository:
     def __init__(self, client: Any | None = None, *, key: str = SNAPSHOT_KEY) -> None:
-        if client is None:
-            from upstash_redis import Redis
-
-            credentials = resolve_upstash_credentials()
-            if credentials is None:
-                raise ValueError("A complete Upstash Redis credential pair is required")
-            url, token = credentials
-            client = Redis(url=url, token=token, allow_telemetry=False)
-        self.client = client
+        self.client = client or create_upstash_client()
         self.key = key
 
     def load(self) -> MenuSnapshot | None:
@@ -61,6 +53,16 @@ class UpstashMenuRepository:
 
 def has_upstash_configuration() -> bool:
     return resolve_upstash_credentials() is not None
+
+
+def create_upstash_client():
+    from upstash_redis import Redis
+
+    credentials = resolve_upstash_credentials()
+    if credentials is None:
+        raise ValueError("A complete Upstash Redis credential pair is required")
+    url, token = credentials
+    return Redis(url=url, token=token, allow_telemetry=False)
 
 
 def resolve_upstash_credentials() -> tuple[str, str] | None:
