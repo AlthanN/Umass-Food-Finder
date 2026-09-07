@@ -15,6 +15,8 @@ def test_index_loads_split_frontend_assets():
     assert response.status_code == 200
     assert b"static/css/styles.css" in response.data
     assert b"static/js/app.js" in response.data
+    assert b'rel="icon"' in response.data
+    assert b"static/image.png" in response.data
 
 
 def test_blank_query_has_consistent_envelope():
