@@ -110,6 +110,8 @@ button:disabled { cursor: wait; opacity: .65; }
 .feedback-status[data-kind="error"] { color: #7b1010; }
 .feedback-unavailable { margin: 0; padding: 14px 16px; border-radius: 10px; color: #684b00; background: var(--warning); }
 .honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.site-disclaimer { margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--line); }
+.site-disclaimer p { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.5; }
 
 [hidden] { display: none !important; }
 
