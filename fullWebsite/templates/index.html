@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Find dishes served at UMass Amherst dining halls.">
-  <title>UMass Food Finder</title>
+  <title>UMass Craves</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='image.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
   <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
@@ -22,7 +22,7 @@
     <header class="hero">
       <img class="logo" src="{{ url_for('static', filename='image.png') }}" alt="">
       <div>
-        <p class="eyebrow">UMass Dining</p>
+        <p class="eyebrow">UMass Craves</p>
         <h1>Find your next craving</h1>
         <p class="subtitle">Search upcoming menus across the four dining commons.</p>
       </div>
@@ -47,7 +47,7 @@
     </form>
 
     <div id="status" class="status" role="status" aria-live="polite">
-      Enter a food name to see where and when it is served.
+      Food searches reflect food served in the next 2 weeks, updated daily at 6am EST.
     </div>
 
     <section id="results" class="results" aria-label="Search results" hidden>
