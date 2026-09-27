@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
@@ -12,12 +13,13 @@ from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from . import config  # Loads the local .env file before reading configuration.
 from .models import MenuItem, MenuSnapshot, SourceFailure
 
 
 LOGGER = logging.getLogger(__name__)
-MENU_PAGE_URL = "https://www.umassdining.com/locations-menus/worcester/menu"
-MENU_API_URL = "https://www.umassdining.com/foodpro-menu-ajax"
+MENU_PAGE_URL = os.getenv("UMASS_MENU_PAGE_URL", "")
+MENU_API_URL = os.getenv("UMASS_MENU_API_URL", "")
 DINING_HALLS = {1: "Worcester", 2: "Franklin", 3: "Hampshire", 4: "Berkshire"}
 
 
@@ -82,6 +84,8 @@ class MenuScraper:
     def _fetch_source(self, source):
         location_id, location_name, date_value = source
         try:
+            if not MENU_API_URL:
+                raise ValueError("UMASS_MENU_API_URL is not configured")
             response = self.session.get(
                 MENU_API_URL,
                 params={"tid": location_id, "date": date_value},
@@ -95,6 +99,8 @@ class MenuScraper:
             return [], failure
 
     def _fetch_dates(self) -> list[str]:
+        if not MENU_PAGE_URL:
+            raise ValueError("UMASS_MENU_PAGE_URL is not configured")
         response = self.session.get(MENU_PAGE_URL, timeout=self.timeout)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, "html.parser")

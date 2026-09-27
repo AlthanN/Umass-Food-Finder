@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 
 from flask import Flask, after_this_request, jsonify, render_template, request
 
+from food_finder import config  # Loads local .env values for development.
 from food_finder import (
     InMemoryMenuRepository,
     InMemorySearchAnalyticsRepository,
