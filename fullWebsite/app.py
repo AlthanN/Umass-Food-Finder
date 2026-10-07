@@ -24,6 +24,11 @@ from food_finder import (
 )
 from food_finder.storage import has_upstash_configuration
 
+PAUSE_MESSAGE = (
+    "I’m fixing a few bugs before bringing the app back online. "
+    "Thanks for your patience—please check back later!"
+)
+
 
 def create_app(
     *,
@@ -35,13 +40,14 @@ def create_app(
 ) -> Flask:
     """Create the app with injectable storage and scraping dependencies."""
     app = Flask(__name__)
+    app.config["APP_PAUSED"] = os.getenv("APP_PAUSED", "false").strip().lower() == "true"
     scraper = scraper or MenuScraper()
 
     if repository is None and menu_snapshot is not None:
         repository = InMemoryMenuRepository(menu_snapshot)
     elif repository is None and has_upstash_configuration():
         repository = UpstashMenuRepository()
-    elif repository is None and load_local_data:
+    elif repository is None and load_local_data and not app.config["APP_PAUSED"]:
         app.logger.info("Loading UMass menus for this application process")
         repository = InMemoryMenuRepository(scraper.fetch())
     elif repository is None:
@@ -62,6 +68,12 @@ def create_app(
 
     @app.get("/")
     def index():
+        if app.config["APP_PAUSED"]:
+            return (
+                render_template("paused.html", pause_message=PAUSE_MESSAGE),
+                503,
+                {"Cache-Control": "no-store"},
+            )
         return render_template(
             "index.html",
             analytics_script_src=app.config["VERCEL_ANALYTICS_SCRIPT_SRC"],
@@ -71,6 +83,15 @@ def create_app(
     @app.get("/search")
     def search_food():
         query = request.args.get("foodName", "").strip()
+        if app.config["APP_PAUSED"]:
+            return jsonify({
+                "query": query,
+                "results": [],
+                "message": f"UMass Craves is temporarily paused. {PAUSE_MESSAGE}",
+                "data_status": "unavailable",
+                "failed_sources": [],
+                "loaded_at": None,
+            }), 503, {"Cache-Control": "no-store"}
         snapshot = _load_snapshot(app)
 
         if not query:

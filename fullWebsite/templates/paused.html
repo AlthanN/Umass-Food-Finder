@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="UMass Craves is temporarily paused while bugs are being fixed.">
+  <title>Temporarily paused · UMass Craves</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='image.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body class="paused-page">
+  <main class="container pause-notice">
+    <img class="logo" src="{{ url_for('static', filename='image.png') }}" alt="">
+    <p class="eyebrow">UMass Craves</p>
+    <h1>UMass Craves is temporarily paused</h1>
+    <p class="subtitle">{{ pause_message }}</p>
+  </main>
+</body>
+</html>

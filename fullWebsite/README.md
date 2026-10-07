@@ -51,6 +51,32 @@ Tests use fake HTTP and Redis clients and never contact UMass Dining.
 7. Open `https://YOUR_DOMAIN/health`. It should return HTTP 200 with an `ok`
    status and a `loaded_at` timestamp.
 
+## Pause or reopen the app
+
+Set this in `fullWebsite/.env` to test the pause screen locally:
+
+```dotenv
+APP_PAUSED=true
+```
+
+Restart Flask and open the home page. Set `APP_PAUSED=false` and restart to
+restore the normal app. An unset flag also defaults to false. Values are
+case-insensitive and surrounding whitespace is ignored. Exported environment
+variables take precedence over `.env`; unset an exported `APP_PAUSED` if you
+want the local file to control it.
+
+On Vercel, set `APP_PAUSED=true` for the desired environment (Production or
+Preview), then redeploy. Set it to `false` and redeploy to reopen the app.
+The local `.env` is ignored by Git and does not change Vercel's settings.
+
+While paused, `/` shows the notice and `/search` rejects requests with the pause
+message. Both return HTTP 503 with `Cache-Control: no-store`. Existing tabs show
+the message on their next submitted search and the pause screen after a reload.
+Static assets, `/health`, authenticated refreshes, and private analytics remain
+available. Paused local startup skips the initial menu scrape; an unseeded local
+health check can therefore report unavailable. Restarting with the flag false
+restores the normal local startup scrape.
+
 ## Enable anonymous feedback
 
 1. Create a form named **UMass Food Finder Feedback** at Formspree and verify
